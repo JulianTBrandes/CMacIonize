@@ -48,5 +48,10 @@ Important files for Stellar winds:
 - MixedDrivingPhotonSourceDistribution.hpp or BurstyPhotonSourceDistribution.hpp
 - SupernovaHandler.hpp
 
-Only modules I have loaded for compilation are:
+Important for Ionizing Spectra:
+- PhotonSourceSpectrumFactory.hpp
+- PlanckPhotonSourceSpectrum.cpp and *.hpp are probably good templates for form - can use whichever <keyword>PhotonSourceSpectrum.cpp/.hpp file fits the spectra you want to implement best 
+- keywords are all displayed in PhotonSourceSpectrumFactory.hpp - these are all options to set in the param file
+
+Only modules I have loaded are:
   1) slurm/23.02.6 (S)   2) lmod
