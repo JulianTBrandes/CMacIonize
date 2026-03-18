@@ -68,8 +68,6 @@ private:
   /*! @brief peakiness fraction */
   const double _scale_height_peak;
   /*! scale height for peak driving */
-  const bool _scale_with_neutral;
-  /*! scale with the neutral gas */
   const double _type1_sne_scale_height;
   /*! scale height for type 1 supernovae*/
   const bool _type1_flag;
@@ -339,7 +337,6 @@ public:
       const double burst_amplitude, // mgb edit 19.09.2025
       const double peakiness_fraction, // mgb edit 11.11.2025
       const double scale_height_peak, // mgb edit 11.11.2025
-      const bool scale_with_neutral, // mgb edit 10.03.2026
       const double type1_sne_scale_height, // mgb edit 11.11.2025
       const bool type1_flag, // mgb edit 12.11.2025
       const double kennicutt_schmidt_index, // mgb edit 12.11.2025 
@@ -366,7 +363,7 @@ public:
       Log *log=nullptr)
       : _star_formation_rate(star_formation_rate), _bursty_sfr_flag(bursty_sfr_flag), _length_of_burst(length_of_burst), _time_of_burst_peak(time_of_burst_peak),
         _burst_amplitude(burst_amplitude), _peakiness_fraction(peakiness_fraction),
-        _scale_height_peak(scale_height_peak), _scale_with_neutral(scale_with_neutral), _type1_sne_scale_height(type1_sne_scale_height), _type1_flag(type1_flag), 
+        _scale_height_peak(scale_height_peak), _type1_sne_scale_height(type1_sne_scale_height), _type1_flag(type1_flag), 
         _kennicutt_schmidt_index(kennicutt_schmidt_index), _restart_flag(restart_flag), _restart_time_myr(restart_time_myr),
         _M_init(M_init), _M_init_unscaled_for_sfr(M_init_unscaled_for_sfr),
         _update_interval(update_interval),
@@ -572,7 +569,6 @@ public:
             params.get_value< double >("PhotonSourceDistribution:peakiness fraction", 1.0), // mgb edit 11.11.2025x
             params.get_physical_value< QUANTITY_LENGTH >( // mgb edit 11.11.2025
                 "PhotonSourceDistribution:scale height peak", "200 pc"), 
-            params.get_value< bool >("PhotonSourceDistribution:scale with neutral", false), // mgb edit 10.03.2026
             params.get_physical_value< QUANTITY_LENGTH >( // mgb edit 11.11.2025
                 "PhotonSourceDistribution:type1 sne scale height", "325 pc"),
             params.get_value< bool >("PhotonSourceDistribution:type1 flag", true), // edit mgb 12.11.2025
@@ -851,7 +847,6 @@ public:
 
       } else {
         // check the next element
-        // add stellar wind
         ++i;
       }
     }
@@ -982,13 +977,9 @@ public:
               cell_mass = 0.0;
             }
 
-            if (_scale_with_neutral == true){
-              running_mass_unscaled_for_sfr += it.get_ionization_variables().get_ionic_fraction(ION_H_n) * cell_mass; // if scale with neutral gas instead of ionised gas
-            } else {
-              running_mass_unscaled_for_sfr += cell_mass;
-            }
+            running_mass_unscaled_for_sfr += cell_mass;
 
-            running_mass+= it.get_ionization_variables().get_ionic_fraction(ION_H_n) * pow(cell_mass, _peakiness_fraction); // pow(1.4) mgb edit add in 11.10.2025 some peak fraction with peak_fraction = 1
+            running_mass+= pow(cell_mass, _peakiness_fraction); // pow(1.4) mgb edit add in 11.10.2025 some peak fraction with peak_fraction = 1
             cumulative_mass[i] = running_mass;
 
             i += 1;
@@ -1078,9 +1069,9 @@ public:
                   cell_length = std::pow(it.get_volume(),1./3.);
                   cell_z = std::abs(it.get_cell_midpoint().z()); //mgb edit 11.11.2025
                  // cell_ionzation = it.get_ionization_variables().get_ionic_fraction(ION_H_n);
-            //      if (it.get_ionization_variables().get_ionic_fraction(ION_H_n) > 0.5 && it.get_ionization_variables().get_temperature() < 1.1e4 && cell_z < _scale_height ) { // mgb edit 05.03.2026: only form stars in cells which are more than 50% neutral - this is to stop forming stars in already ionised regions 
-                  goto afterloop;
-              //    }
+                  if (it.get_ionization_variables().get_ionic_fraction(ION_H_n) > 0.5 && it.get_ionization_variables().get_temperature() < 1.1e4 && cell_z < _scale_height ) { // mgb edit 05.03.2026: only form stars in cells which are more than 50% neutral - this is to stop forming stars in already ionised regions 
+                    goto afterloop;
+                  }
 
 
                 }
@@ -1186,7 +1177,6 @@ public:
     restart_writer.write(_burst_amplitude); // mgb edit 19.09.2025
     restart_writer.write(_peakiness_fraction); // mgb edit 11.11.2025
     restart_writer.write(_scale_height_peak); // mgb edit 11.11.2025 
-    restart_writer.write(_scale_with_neutral); // mgb edit 10.03.2026
     restart_writer.write(_type1_sne_scale_height); // mgb edit 11.11.2025
     restart_writer.write(_type1_flag); // mgb edit 12.11.2025
     restart_writer.write(_kennicutt_schmidt_index); // mgb edit 12.11.2025
@@ -1275,7 +1265,6 @@ public:
         _burst_amplitude(restart_reader.read< double >()), // mgb edit 19.09.2025
         _peakiness_fraction(restart_reader.read< double >()), // mgb edit 11.11.2025
         _scale_height_peak(restart_reader.read< double >()), // mgb edit 11.11.2025
-        _scale_with_neutral(restart_reader.read< double >()), // mgb edit 10.03.2026
         _type1_sne_scale_height(restart_reader.read< double >()), // mgb edit 11.11.2025
         _type1_flag(restart_reader.read< bool >()), // mgb edit 12.11.2025
         _kennicutt_schmidt_index(restart_reader.read< double>()), // mgb edit 12.11.2025
