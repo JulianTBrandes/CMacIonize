@@ -41,6 +41,7 @@
 #include "SILCCPhotonSourceDistribution.hpp"
 #include "SingleStarPhotonSourceDistribution.hpp"
 #include "SingleSupernovaPhotonSourceDistribution.hpp"
+#include "SingleStellarWindPhotonSourceDistribution.hpp" // jb450 18.02.2026
 #include "UniformRandomPhotonSourceDistribution.hpp"
 #include "TextFilePhotonSourceDistribution.hpp"
 #include "IMFDiscPhotonSourceDistribution.hpp"
@@ -145,6 +146,8 @@ public:
       return new SingleStarPhotonSourceDistribution(params, log);
     } else if (type == "SingleSupernova") {
       return new SingleSupernovaPhotonSourceDistribution(params, log);
+    } else if (type == "SingleStellarWind") {
+      return new SingleStellarWindPhotonSourceDistribution(params, log); // jb450 18.02.2026
     } else if (type == "SinkStar") {
       return new SinkStarPhotonSourceDistribution(params, log);
     } else if (type == "StellarCluster") {

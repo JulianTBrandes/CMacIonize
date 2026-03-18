@@ -8,7 +8,7 @@
  * (at your option) any later version.
  *
  * CMacIonize is distributed in the hope that it will be useful,
- * but WITOUT ANY WARRANTY; without even the implied warranty of
+ * but WIHTOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
  *
@@ -23,11 +23,10 @@
  *
  * @author Julian Brandes (jb450@st-andrews.ac.uk)
  */
-#ifndef StellarWindHandler_HPP
-#define StellarWindHandler_HPP
+#ifndef STELLARWINDHANDLER_HPP
+#define STELLARWINDHANDLER_HPP
 
-#include <cmath>
-#include "HydroIntegrator.hpp"
+#include "DensitySubGridCreator.hpp"
 
 /**
  * @brief Handler with useful functions.
@@ -35,8 +34,7 @@
 class StellarWindHandler {
 private:
 
-    double _sw_energy;
-    const double HydroIntegrator& hydrointegrator;
+double _source_luminosities;
 
 public:
   /**
@@ -46,142 +44,132 @@ public:
    * @param opening_angle Opening angle that determines the accuracy of the
    * tree walk.
    */
+  StellarWindHandler(){
 
-
-  StellarWindHandler(const HydroIntegrator& hydrointegrator)
-      : _hydrointegrator(hydrointegrator) {}
-
-        inline double get_jeans_length(const DensityGrid::iterator& cell) const
-    {
-        const double rho =
-            cell.get_hydro_variables().get_primitives_density();
-
-        const double cs =
-            _hydrointegrator.get_soundspeed(cell);
-
-        return std::sqrt(M_PI * cs * cs / (G * rho));
-    }
+        //constructor functionality
 
   }
+   
+   inline double get_sw_mass_loss_rate(double mass){
 
-  inline std::tuple<double,double,double,double> get_r_inj(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator,
-                                         CoordinateVector<> sne_loc) {
+      static const std::vector<double> table_mass = { 5.897418435090001e+32, 3.94091048052e+32, 2.9619041341500004e+32, 2.37256574139e+32, 1.68294037743e+32, 1.18929695157e+32, 7.939154960100001e+31, 6.355975005900001e+31, 4.9686405444000005e+31, 3.9763978605000006e+31, 2.982752136e+31, 2.3865933429e+31, 1.7900813034e+31, 1.3922990055000003e+31 };
+      static const std::vector<double> table_mass_loss_rate = { -4.125, -4.45, -4.691, -4.888, -5.22, -5.605, -6.149, -6.511, -6.977, -7.471, -7.976, -8.679, -9.973, -11.428 };
+      double mass_loss_rate = 0.0;
 
-
-
-      HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(sne_loc);
-
-      double cell_vol =  subgrid.get_cell(sne_loc).get_volume();
-
-
-      double dx = std::pow(cell_vol,1./3.);
-
-      double r_run = 4*dx;
-      double num_cells;
-      std::vector<std::pair<uint_fast32_t,uint_fast32_t>> vec;
-
-
-      vec = grid_creator->cells_within_radius(sne_loc,r_run);
-
-
-      double mtot = 0.0;
-      for (auto & pair : vec) {
-        HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(std::get<0>(pair));
-        mtot = mtot + (subgrid.hydro_begin() + std::get<1>(pair)).get_hydro_variables().get_conserved_mass();
-
-      }
-      if (mtot > 1.988e+33) {
-        double inj_vol = 1.3333*3.14159265*std::pow(r_run,3.0);
-        double rho = mtot/inj_vol;
-        double nbar = 1.e-6*rho/1.67262192e-27;
-        double r_st = 3.086e+16 * 19.1 * std::pow(_sw_energy*1.e-44,5./17.) * std::pow(nbar,-7./17);
-        return std::make_tuple(r_run,r_st,nbar,268.);
+      if (mass > table_mass.front()){
+        mass_loss_rate = table_mass_loss_rate.front();
+        mass_loss_rate = std::pow(10,mass_loss_rate);
+        return mass_loss_rate;
+      } else if (mass < table_mass.back()) {
+        return 0.0;
       }
 
-      while (mtot < 1.988e+33) {
-        r_run = r_run+(0.25*dx);
-        vec = grid_creator->cells_within_radius(sne_loc,r_run);
-        mtot = 0.0;
-        for (auto & pair : vec) {
-          HydroDensitySubGrid &subgrid = *grid_creator->get_subgrid(std::get<0>(pair));
-          double cell_mass = (subgrid.hydro_begin() + std::get<1>(pair)).get_hydro_variables().get_conserved_mass();
-          mtot = mtot + cell_mass;
-        }
+      // Find the interval containing x
+      for (size_t i = 0; i < table_mass.size() - 1; ++i) {
+          if (table_mass[i] >= mass && mass >= table_mass[i + 1]) {
+              // Perform linear interpolation
+              double x1 = table_mass[i];
+              double x2 = table_mass[i + 1];
+              double y1 = table_mass_loss_rate[i];
+              double y2 = table_mass_loss_rate[i + 1];
+              mass_loss_rate = y1 + (mass - x1) * (y2 - y1) / (x2 - x1);
+              break;
+          }
       }
-    
-    num_cells = vec.size();
-    double inj_vol = 1.3333*3.14159265*std::pow(r_run,3.0);
-    double rho = mtot/inj_vol;
-    double nbar = 1.e-6*rho/1.67262192e-27;
-    double r_st = 3.086e+16 * 19.1 * std::pow(_sw_energy*1.e-44,5./17.) * std::pow(nbar,-7./17);
-    return std::make_tuple(r_run, r_st, nbar, num_cells);
 
-   }
+      mass_loss_rate = std::pow(10.0, mass_loss_rate) * 1.989e30;
+      return mass_loss_rate; //in kg
+   };
 
+   inline double get_sw_velocity(double mass){
 
+      static const std::vector<double> table_mass = { 5.897418435090001e+32, 3.94091048052e+32, 2.9619041341500004e+32, 2.37256574139e+32, 1.68294037743e+32, 1.18929695157e+32, 7.939154960100001e+31, 6.355975005900001e+31, 4.9686405444000005e+31, 3.9763978605000006e+31, 2.982752136e+31, 2.3865933429e+31, 1.7900813034e+31, 1.3922990055000003e+31};
+      static const std::vector<double> table_vels = { 3359.3377, 3368.0662, 3357.7034, 3338.8328, 3289.3316, 3211.7465, 3087.2741, 3004.4142, 2902.0406, 2801.616, 2664.5831, 2555.2617, 2413.9634, 1788.908};
+      double vel = 0.0;
 
-   inline void inject_sne(HydroDensitySubGrid &subgrid, Hydro &hydro, CoordinateVector<double> position,
-         double r_inj, double r_st, double nbar, int numcells) {
+      if (mass > table_mass.front()){
+        vel = table_vels.front();
+        return vel;
+      } else if (mass < table_mass.back()) {
+        return 0.0;
+      }
 
-      for (auto cellit = subgrid.hydro_begin();
-           cellit != subgrid.hydro_end(); ++cellit) {
+      // Find the interval containing x
+      for (size_t i = 0; i < table_mass.size() - 1; ++i) {
+          if (table_mass[i] >= mass && mass >= table_mass[i + 1]) {
+              // Perform linear interpolation
+              double x1 = table_mass[i];
+              double x2 = table_mass[i + 1];
+              double y1 = table_vels[i];
+              double y2 = table_vels[i + 1];
+              vel = y1 + (mass - x1) * (y2 - y1) / (x2 - x1);
+              break;
+          }
+      }
 
-           CoordinateVector<> cellpos = cellit.get_cell_midpoint();
+      return vel; // in km/s
+   };
 
-          // is cell within injeciton radius of SNe?
-           if ((cellpos - position).norm() < r_inj) {
-                if (cellit.get_hydro_variables().get_primitives_density() == 0) {
-                    //dont add energy to cell without mass...
-                    return;
-                }
-             double dx = std::pow(cellit.get_volume(),1./3.);
-             if (r_st < 4.*dx) {
+   inline void inject_sw(
+    DensitySubGridCreator<HydroDensitySubGrid>* grid_creator,
+    Hydro& hydro,
+    CoordinateVector<double> sw_loc,
+    double mass,
+    double timestep)
+{
+    double mdot  = get_sw_mass_loss_rate(mass);
+    double vwind = get_sw_velocity(mass) * 1000.0;
 
-//Not resolving ST radius, do momentum injection
-              CoordinateVector<> vel_prior =
-                       cellit.get_hydro_variables().get_primitives_velocity();
+    double dt_year = timestep / 31557600.0;
 
-                // Blondin et al
-               double mom_to_inj = 2.6e5*std::pow(nbar,-2./17) * std::pow(_sw_energy*1.e-44,16./17.);
-               // Msol km/s to kg m/s
-               mom_to_inj = mom_to_inj * 2.e30 * 1.e3;
+    double mass_to_inject   = mdot * dt_year;
+    double energy_to_inject = 0.5 * mass_to_inject * vwind * vwind;
 
-               double m_tot = (nbar*1e6*1.67e-27)*(4.*3.14159265*std::pow(r_inj,3)/3.);
+    // get local subgrid
+    auto subgrid_it = grid_creator->get_subgrid(sw_loc);
+    HydroDensitySubGrid &subgrid = *subgrid_it;
 
-               double vel_to_inj = mom_to_inj/m_tot;
+    // determine resolution scale
+    double cell_vol = subgrid.get_cell(sw_loc).get_volume();
+    double dx = std::pow(cell_vol, 1./3.);
+    double r_inj = 4.0 * dx;
 
-               CoordinateVector<> direction = (cellpos-position)/((cellpos-position).norm());
+    // find cells inside sphere
+    auto cells = grid_creator->cells_within_radius(sw_loc, r_inj);
+    int numcells = cells.size();
 
-               CoordinateVector<> vel_new = vel_prior + vel_to_inj*direction;
+    if (numcells == 0)
+        return;
 
-               cellit.get_hydro_variables().set_primitives_velocity(vel_new);
+    double mass_per_cell   = mass_to_inject / numcells;
+    double energy_per_cell = energy_to_inject / numcells;
 
+    double density_add = mass_per_cell / cell_vol;
 
-           //    double density = cellit.get_hydro_variables().get_primitives_density();
+    for (const auto &c : cells) {
 
-             //  double xH = cellit.get_ionization_variables().get_ionic_fraction(ION_H_n);
+        auto sg_it = grid_creator->get_subgrid(c.first);
+        HydroDensitySubGrid &sg = *sg_it;
 
+        auto cellit = sg.hydro_begin() + c.second;
 
-              // double pressure = 8254.397014*1.e4*density*2./(1.+xH);
+        auto &hydro_vars = cellit.get_hydro_variables();
 
-              //cellit.get_ionization_variables().set_temperature(1.e4);
+        double rho_old = hydro_vars.get_primitives_density();
+        double m_old   = hydro_vars.get_conserved_mass();
 
-             // cellit.get_hydro_variables().set_primitives_pressure(pressure);
+        hydro_vars.set_primitives_density(
+            rho_old + density_add);
 
-              hydro.set_conserved_variables(cellit.get_hydro_variables(), cellit.get_volume());
+        hydro_vars.set_conserved_mass(
+            m_old + mass_per_cell);
 
-             }
-             else {
-               cellit.get_hydro_variables().set_energy_term(_sw_energy/numcells);
-             }
-           }
+        hydro_vars.set_energy_term(
+            hydro_vars.get_energy_term() + energy_per_cell);
+    }
 
-        }
-
-
-
-
-   }
+    return;
+  }
 
   /**
    * @brief Destructor.
@@ -189,4 +177,4 @@ public:
   ~StellarWindHandler() {}
 };
 
-#endif // StellarWindHandler_HPP
+#endif // STELLARWINDHANDLER_HPP
