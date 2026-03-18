@@ -28,6 +28,9 @@
 #include "Log.hpp"
 #include "ParameterFile.hpp"
 #include <cinttypes>
+#include <random>
+#include <vector>
+#include <algorithm>
 
 /**
  * @brief Constructor.
@@ -41,12 +44,12 @@
  */
 CMacIonizeSnapshotDensityFunction::CMacIonizeSnapshotDensityFunction(
     std::string filename, const bool use_density, const bool use_pressure,
-    const double initial_neutral_fraction, const double dust_gas_ratio,
+    const double initial_neutral_fraction, const double dust_gas_ratio, const bool randomize_velocity_flag, const double temperature_to_randomize,
     const double fraction_silicates, Log *log)
     : _filename(filename), _use_density(use_density),
       _use_pressure(use_pressure),
       _initial_neutral_fraction(initial_neutral_fraction),
-      _dust_gas_ratio(dust_gas_ratio), _fraction_silicates(fraction_silicates),
+      _dust_gas_ratio(dust_gas_ratio), _randomize_velocity_flag(randomize_velocity_flag), _temperature_to_randomize(temperature_to_randomize), _fraction_silicates(fraction_silicates),
       _log(log),
       _cartesian_grid(nullptr), _amr_grid(nullptr),
       _voronoi_pointlocations(nullptr) {
@@ -81,6 +84,9 @@ CMacIonizeSnapshotDensityFunction::CMacIonizeSnapshotDensityFunction(
                                      1.e-6),
           params.get_value< double >("DensityFunction:dust to gas",
                                       0.0),
+          params.get_value< bool > ("DensityFunction:randomize velocity flag", false),
+          params.get_physical_value< QUANTITY_TEMPERATURE >(
+              "DensityFunction:temperature to randomize", "1e4 K"),
           params.get_value< double >("DensityFunction:fraction silicates",
                                                     1.e-6),
 
@@ -260,6 +266,29 @@ void CMacIonizeSnapshotDensityFunction::initialize() {
     cell_velocities =
         HDF5Tools::read_dataset< CoordinateVector<> >(group, "Velocities");
   }
+// mgb edit start 05.03.2026: shuffle the velocities of cells with temperature < 1000 K to avoid forming stars in already ionised regions 
+  if (_randomize_velocity_flag==true) {
+    std::vector<size_t> indices_to_shuffle;
+    for (size_t i = 0; i < cell_temperatures.size(); ++i) {
+        if (cell_temperatures[i] < _temperature_to_randomize) {
+            indices_to_shuffle.push_back(i);
+        }
+    }
+
+    std::vector<CoordinateVector<>> velocities_to_shuffle;
+    for (size_t idx : indices_to_shuffle) {
+        velocities_to_shuffle.push_back(cell_velocities[idx]);
+    }
+
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(velocities_to_shuffle.begin(), velocities_to_shuffle.end(), g);
+
+    for (size_t i = 0; i < indices_to_shuffle.size(); ++i) {
+        cell_velocities[indices_to_shuffle[i]] = velocities_to_shuffle[i];
+    }
+  }
+  // mgb edit end 05.03.2026
 
   HDF5Tools::close_group(group);
 
