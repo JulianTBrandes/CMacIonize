@@ -1012,8 +1012,8 @@ public:
       std::cout << "Making 1 single star " << _single_star_flag << std::endl;
       
 
-      double m_cur = 57.95; //get_single_mass(_mass_range,_cum_imf,
-              //_random_generator.get_uniform_random_double());
+      double m_cur = get_single_mass(_mass_range,_cum_imf,
+              _random_generator.get_uniform_random_double());
       double x =
         _anchor_x + _random_generator.get_uniform_random_double() * _sides_x;
       double y =
