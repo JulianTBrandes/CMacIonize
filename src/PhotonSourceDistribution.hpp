@@ -99,6 +99,8 @@ public:
 
   virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double actual_timestep) {return false;}
 
+  virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, Hydro &hydro, double actual_timestep) {return false;}
+
   virtual void set_initial_velocity(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double timestep) {}
   virtual void float_sources(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double timestep) {}
 
@@ -159,6 +161,8 @@ public:
    * @brief Finalise adding stellar feedback to a distributed grid.
    */
   virtual void done_stellar_feedback() {}
+
+  virtual void add_stellar_wind_feedback(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator,Hydro &hydro) {}
 
   /**
    * @brief Write the distribution to the given restart file.

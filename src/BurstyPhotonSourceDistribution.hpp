@@ -851,6 +851,7 @@ public:
 
       } else {
         // check the next element
+        // add stellar wind
         ++i;
       }
     }
