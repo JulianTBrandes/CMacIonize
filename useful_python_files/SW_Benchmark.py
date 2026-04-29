@@ -41,15 +41,22 @@ def get_tb_grid(grid,subgriddim,gridsize):
 
     return result
 
+plt.rcParams.update({
+    "font.size": 20,
+    "axes.labelsize": 20,
+    "axes.titlesize": 20,
+    "xtick.labelsize": 14,
+    "ytick.labelsize": 14
+})
 
-folders = ["/sharedscratch/jb450/CMacIonize/CMacIonize/SW_Test/"]
+folders = ["/sharedscratch/jb450/CMacIonize/CMacIonize/SW_Test_Large_Radius/"]
 save_path = "Png"
 
 os.makedirs(os.path.join(save_path, "2D"), exist_ok=True)
 os.makedirs(os.path.join(save_path, "Number_Density"), exist_ok=True)
 os.makedirs(os.path.join(save_path, "Temperature"), exist_ok=True)
 
-times = np.arange(0, 31, 1) # fiducial sims to 500 Myr
+times = np.arange(30, 51, 1) # fiducial sims to 500 Myr
 
 
 # constants
@@ -61,7 +68,7 @@ yr = 365.25*24*60*60 # seconds
 
 for i, folder in enumerate(folders):
     for t_ind, time in enumerate(times):
-        fig = plt.figure(layout='constrained', figsize=(60,30))
+        fig = plt.figure(layout='constrained', figsize=(20,10))
 
         gs = GridSpec(3, 4, figure = fig)#,  width_ratios=[2, 2, 2, 1, 1, 1, 1, 0.1] )
         mo1 = fig.add_subplot(gs[:,0])
@@ -98,7 +105,7 @@ for i, folder in enumerate(folders):
             subgrids = ast.literal_eval(file["/Parameters"].attrs["DensitySubGridCreator:number of subgrids"].decode("utf-8"))
             subgrids = np.array(subgrids)
             pix_size = box[0]/grid[0]
-            box_x = 40
+            box_x = 120
             box_y = box_x
             box_z = box_x
             cell_x = 64
@@ -140,7 +147,7 @@ for i, folder in enumerate(folders):
             ntot_sl = ntot[:,63,:] #np.sum(ntot, axis=1)
             halpha_proj = np.sum(halpha, axis=1)
             
-            bbox = np.array([[-40, 40], [-40, 40], [-40, 40]])
+            bbox = np.array([[-box_x/2, box_x/2], [-box_x/2, box_x/2], [-box_x/2, box_x/2]])
             ntot_yt = {('gas', 'number_density'): (ntot, "cm**-3")}
             nf_yt = {('gas', 'neutral_fraction'): (nf, "")}
             temp_yt = {('gas', 'temperature'): (temp, "K")}
@@ -161,10 +168,10 @@ for i, folder in enumerate(folders):
             # p = yt.ProjectionPlot(ds, 'y', ('gas', 'temperature')) # make single projection plot 
             # p.save('../mo_shs_mass/proj.png')
 
-            frb = slc.to_frb(width=(40, 'pc'), height=(40, 'pc'), resolution=(128,128), center=(0,0,0))
-            frb2 = slc2.to_frb(width=(40, 'pc'), height=(40, 'pc'), resolution=(128,128), center=(0,0,0))
-            frb3 = slc3.to_frb(width=(40, 'pc'), height=(40, 'pc'), resolution=(128,128), center=(0,0,0))
-            frb4 = slc4.to_frb(width=(40, 'pc'), height=(40, 'pc'), resolution=(128,128), center=(0,0,0))
+            frb = slc.to_frb(width=(box_x/2, 'pc'), height=(box_x/2), resolution=(128,128), center=(0,0,0))
+            frb2 = slc2.to_frb(width=(box_x/2, 'pc'), height=(box_x/2, 'pc'), resolution=(128,128), center=(0,0,0))
+            frb3 = slc3.to_frb(width=(box_x/2, 'pc'), height=(box_x/2, 'pc'), resolution=(128,128), center=(0,0,0))
+            frb4 = slc4.to_frb(width=(box_x/2, 'pc'), height=(box_x/2, 'pc'), resolution=(128,128), center=(0,0,0))
             
             mass_img_data = np.array(frb['gas', 'mass'])
             temp_img_data = np.array(frb2['gas', 'temperature'])
@@ -178,7 +185,7 @@ for i, folder in enumerate(folders):
             cmaps = ['inferno', 'hot', 'viridis', 'bone', 'pink', 'gist_heat', 'twilight_shifted_r'] # gist_earth, magma (like inferno) YlGnbu, Spectral (blue larger)
             # Blue-Red
             
-            print(f"Time Step: {time} Myr")
+            print(f"Time Step: {time/10} Myr")
             print(f"Temp data shape: {temp_img_data.shape}, Min/Max: {np.min(temp_img_data):.2e}, {np.max(temp_img_data):.2e}")
             plot_extent = [-box_x, box_x, -box_z, box_z]
 
@@ -193,13 +200,13 @@ for i, folder in enumerate(folders):
 
 
             cb1.set_label(r'Temperature (K)', labelpad=20)
-            cb2.set_label(r'Number Density (cm^{-3})', labelpad=20)
+            cb2.set_label(r'Number Density ($cm^{-3}$)', labelpad=20)
             cb3.set_label(r'Total Energy (J)', labelpad=20)
             cb4.set_label(r'$v_{z}$ ($km \ s^{-1}$)', labelpad=20)
 
 
-            fig.suptitle(str(time)+' Myr')
-            filepath = os.path.join(save_path,'2D','2D_Plot_'+addon+str(time)+'.png')
+            fig.suptitle(str(time/10)+' Myr')
+            filepath = os.path.join(save_path,'2D','2D_Plot_'+addon+str(time)+'.svg')
             fig.savefig(filepath)
             plt.close(fig)
             
@@ -207,7 +214,7 @@ for i, folder in enumerate(folders):
             center = [0, 0, 0]
 
             # Define spherical region
-            sp = ds.sphere(center, (40, "pc"))
+            sp = ds.sphere(center, (box_x, "pc"))
             r = sp["index", "radius"].to("pc")
 
             r_min = r.min()
@@ -244,14 +251,14 @@ for i, folder in enumerate(folders):
             fig1, ax1 = plt.subplots()
 
             ax1.plot(r, temp)
-            ax1.set_title(f"{time} Myr")
+            ax1.set_title(f"{time/10} Myr")
             ax1.set_xlabel("Radius (pc)")
             ax1.set_ylabel("Temperature (K)")
             ax1.set_yscale("log")
             ax1.set_xscale("linear")
             ax1.set_ylim(10,10**9)
-            filepath = os.path.join(save_path,"Temperature",'Radial_Plot_Temp_'+addon+str(time)+'.png')
-            fig1.savefig(filepath, dpi=300)
+            filepath = os.path.join(save_path,"Temperature",'Radial_Plot_Temp_'+addon+str(time)+'.svg')
+            fig1.savefig(filepath, dpi=300, bbox_inches="tight", pad_inches=0.1)
             plt.close(fig1)
 
 
@@ -259,29 +266,15 @@ for i, folder in enumerate(folders):
             fig2, ax2 = plt.subplots()
 
             ax2.plot(r, ntot)
-            ax2.set_title(f"{time} Myr")
+            ax2.set_title(f"{time/10} Myr")
             ax2.set_xlabel("Radius (pc)")
             ax2.set_ylabel("Number Density (cm$^{-3}$)")
             ax2.set_yscale("log")
             ax2.set_xscale("linear")
             ax2.set_ylim(10**-6,30)
-            filepath = os.path.join(save_path,"Number_Density","Radial_Plot_Number_Density_"+addon+str(time)+'.png')
-            fig2.savefig(filepath, dpi=300)
+            filepath = os.path.join(save_path,"Number_Density","Radial_Plot_Number_Density_"+addon+str(time)+'.svg')
+            fig2.savefig(filepath, dpi=300, bbox_inches="tight", pad_inches=0.1)
             plt.close(fig2)
-
-            # Mass
-            fig3, ax3 = plt.subplots()
-
-            ax3.plot(r, mass)
-            ax3.set_title(f"{time} Myr")
-            ax3.set_xlabel("Radius (pc)")
-            ax3.set_ylabel("Mass (kg)")
-            ax3.set_yscale("log")
-            ax3.set_xscale("linear")
-            #ax3.set_ylim(10**-6,30)
-            filepath = os.path.join(save_path,"Mass","Radial_Plot_Mass_"+addon+str(time)+'.png')
-            fig3.savefig(filepath, dpi=300)
-            plt.close(fig3)
 
 '''
 

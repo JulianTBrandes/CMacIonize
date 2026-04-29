@@ -23,7 +23,4 @@ def pngs_to_mp4(input, output_file, fps=30):
     video.release()
     print("Video saved to:", output_file)
 
-pngs_to_mp4("Temperature", "Temperature.mp4", fps=24)
-pngs_to_mp4("Number_Density", "Number_Density.mp4", fps=24)
-pngs_to_mp4("Mass", "Mass.mp4", fps=24)
 pngs_to_mp4("2D", "2D.mp4", fps=24)

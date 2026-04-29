@@ -30,3 +30,16 @@
 
 #Folder
 SW_Test/
+SW_Test_2/
+SW_Test_3_No_SW/
+SW_Test_Large_N_No_SW/
+SW_Test_Large_N_SW/
+SW_Test_Large_R_12/
+SW_Test_Large_R_No_12/
+SW_Test_Large_Radius/
+SW_Test_Large_Radius_No_SW/
+SW_Test_No_SW
+build/
+Ignore
+
+useful_python_files/DIG_Plot.py

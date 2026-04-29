@@ -41,13 +41,20 @@ def get_tb_grid(grid,subgriddim,gridsize):
 
     return result
 
+plt.rcParams.update({
+    "font.size": 20,
+    "axes.labelsize": 20,
+    "axes.titlesize": 20,
+    "xtick.labelsize": 14,
+    "ytick.labelsize": 14
+})
 
-folders = ["/sharedscratch/jb450/CMacIonize/CMacIonize/SW_Test_3_No_SW/"]
+folders = ["/sharedscratch/jb450/CMacIonize/CMacIonize/SW_Test/"]
 save_path = "Png"
 
-#os.makedirs(save_path, exist_ok=True)
+os.makedirs(os.path.join(save_path, "2D"), exist_ok=True)
 
-times = np.arange(0, 301, 1) # fiducial sims to 100 Myr
+times = np.arange(0, 101, 1) # fiducial sims to 500 Myr
 
 
 # constants
@@ -59,24 +66,6 @@ yr = 365.25*24*60*60 # seconds
 
 for i, folder in enumerate(folders):
     for t_ind, time in enumerate(times):
-        fig = plt.figure(layout='constrained', figsize=(60,30))
-
-        gs = GridSpec(3, 4, figure = fig)#,  width_ratios=[2, 2, 2, 1, 1, 1, 1, 0.1] )
-        mo1 = fig.add_subplot(gs[:,0])
-        mo2 = fig.add_subplot(gs[:,1])
-        mo3 = fig.add_subplot(gs[:,2])
-        mo4 = fig.add_subplot(gs[:,3])
-
-        mo1.set_box_aspect(6)
-        mo2.set_box_aspect(6)
-        mo3.set_box_aspect(6)
-        mo4.set_box_aspect(6)
-
-        mo1.set_xlabel('x (kpc)')
-        mo2.set_xlabel('x (kpc)')
-        mo3.set_xlabel('x (kpc)')
-        mo4.set_xlabel('x (kpc)')
-        mo1.set_ylabel('z (kpc)')
 
         if time < 10:
             addon = '00'
@@ -84,7 +73,7 @@ for i, folder in enumerate(folders):
             addon = '0'
         else:
             addon = ''
-        filename = 'disc_patch_reference_'+addon+str(time)+'.hdf5'
+        filename = 'disc_patch_'+addon+str(time)+'.hdf5'
 
         with h5py.File(folder+filename) as file:
             #get simulation box dimension in SI and pc
@@ -96,12 +85,13 @@ for i, folder in enumerate(folders):
             subgrids = ast.literal_eval(file["/Parameters"].attrs["DensitySubGridCreator:number of subgrids"].decode("utf-8"))
             subgrids = np.array(subgrids)
             pix_size = box[0]/grid[0]
-            box_x = 0.5
-            box_y = box_x
-            box_z = 3
+            # use real box size from file
+            box_x = box_pc[0] / 2
+            box_y = box_pc[1] / 2
+            box_z = box_pc[2] / 2
             cell_x = 64
             cell_y = cell_x
-            cell_z = 384
+            cell_z = 512
             domain = np.array([[-cell_x, cell_x], [-cell_y, cell_y], [-cell_z, cell_z]])
             domain = np.array([[-box_x, box_x], [-box_y, box_y], [-box_z, box_z]])
             filepart = file['PartType0']
@@ -118,55 +108,81 @@ for i, folder in enumerate(folders):
             xs = x[:,63,:]
             zs = z[:,63,:]
 
-            #print(np.shape(xs))
-            #print('min and max of x and z = ', np.min(xs), np.max(xs), np.min(zs), np.max(zs))
+            # --- Reconstruct fields ---
+            temp = get_tb_grid(filepart['Temperature'], subgrids, grid)
+            ntot = get_tb_grid(filepart['NumberDensity'], subgrids, grid)
+            nf   = get_tb_grid(filepart['NeutralFractionH'], subgrids, grid)
+            vz   = get_tb_grid(velz, subgrids, grid)
+            Etot = get_tb_grid(filepart['TotalEnergy'], subgrids, grid)
 
-            temp = get_tb_grid(filepart['Temperature'],subgrids,grid)
-            ntot = get_tb_grid(filepart['NumberDensity'],subgrids,grid)
-            nf = get_tb_grid(filepart['NeutralFractionH'], subgrids, grid)
-            vz /= (10**3) #convert to m/s
-            vz[:,:,0:int(grid[2]/2)] = -(vz[:,:,0:int(grid[2]/2)])
-            ntot /= (10**6) #convert to cm^-3
+            # --- Unit conversions ---
+            vz /= 1e3              # m/s → km/s
+            ntot /= 1e6            # m^-3 → cm^-3
 
-            alpha = 1.17 *10**-13 * temp**(-0.942-0.030*np.log(temp))# data["stream", "Temperature"]**(-0.942-0.030*np.log(data["stream", "Temperature"]))  cm^3/second
-            halpha = (alpha * (((1-nf)*ntot)**2))/(4*np.pi) *pix_size**3 # (((1-data["stream", "Neutral Fraction"])*data["Number Density"])**2))/(4*np.pi) cm^3 s^-1 m^-3 m^3 
+            # --- Derived quantities (correct cell volume) ---
+            dx = box[0] / grid[0]
+            dy = box[1] / grid[1]
+            dz = box[2] / grid[2]
+            cell_volume = dx * dy * dz
+
+            alpha = 1.17e-13 * temp**(-0.942 - 0.030*np.log(temp))
+            halpha = (alpha * (((1 - nf) * ntot)**2)) / (4*np.pi) * cell_volume
+
             neutral_h = ntot * nf
             ionized_h = ntot * (1 - nf)
-            
-            temp_sl = temp[:,0,:] #
-            print(np.shape(temp_sl))
-            ntot_sl = ntot[:,63,:] #np.sum(ntot, axis=1)
-            halpha_proj = np.sum(halpha, axis=1)
-            
-            bbox = np.array([[-0.5, 0.5], [-0.5, 0.5], [-3, 3]])
-            ntot_yt = {('gas', 'number_density'): (ntot, "cm**-3")}
-            nf_yt = {('gas', 'neutral_fraction'): (nf, "")}
-            temp_yt = {('gas', 'temperature'): (temp, "K")}
-            vz_yt = {('gas', 'velocity_z'): (vz, "km/s")} 
-            halpha_yt = {('gas', 'halpha'): (halpha, "cm**3/s")} # this unit is not correct ...
-            Neutral_H_yt = {('gas', 'neutral_hydrogen'): (neutral_h, "m**-3")}
-            Ionized_H_yt = {('gas', 'ionized_hydrogen'): (ionized_h, "m**-3")}
-            data_fields = {**ntot_yt, **temp_yt, **nf_yt, **vz_yt, **halpha_yt, **Neutral_H_yt, **Ionized_H_yt}
 
-                # this will make projection plots weighted by number density:
-            ds = yt.load_uniform_grid(data_fields, grid, length_unit =("kpc"), bbox=bbox, nprocs=1)
-            slc = ds.proj(('gas', 'neutral_hydrogen'), axis=1, weight_field=('gas', 'number_density'))
-            slc2 = ds.proj(('gas', 'temperature'), axis=1, weight_field=('gas', 'number_density'))
-            slc3 = ds.proj(('gas', 'ionized_hydrogen'), axis=1, weight_field=('gas', 'number_density'))
-            slc4 = ds.proj(('gas', 'velocity_z'), axis=1, weight_field=('gas', 'number_density'))
-            # p = yt.ProjectionPlot(ds, 'y', ('gas', 'temperature')) # make single projection plot 
-            # p.save('../mo_shs_mass/proj.png')
+            # --- yt dataset ---
+            bbox = np.array([
+                [-box_x, box_x],
+                [-box_y, box_y],
+                [-box_z, box_z]
+            ])
 
-            frb = slc.to_frb(width=(6, 'kpc'), height=(1, 'kpc'), resolution=(768,128), center=(0,0,0))
-            frb2 = slc2.to_frb(width=(6, 'kpc'), height=(1, 'kpc'), resolution=(768,128), center=(0,0,0))
-            frb3 = slc3.to_frb(width=(6, 'kpc'), height=(1, 'kpc'), resolution=(768,128), center=(0,0,0))
-            frb4 = slc4.to_frb(width=(6, 'kpc'), height=(1, 'kpc'), resolution=(768,128), center=(0,0,0))
-            temp_img_data = np.array(frb2['gas', 'temperature'])
+            data_fields = {
+                ('gas', 'number_density'): (ntot, "cm**-3"),
+                ('gas', 'temperature'): (temp, "K"),
+                ('gas', 'neutral_fraction'): (nf, ""),
+                ('gas', 'velocity_z'): (vz, "km/s"),
+                ('gas', 'halpha'): (halpha, "cm**3/s"),
+                ('gas', 'neutral_hydrogen'): (neutral_h, "m**-3"),
+                ('gas', 'ionized_hydrogen'): (ionized_h, "m**-3"),
+                ('gas', 'total_energy'): (Etot, "J")
+            }
+
+            ds = yt.load_uniform_grid(
+                data_fields,
+                grid,
+                length_unit="pc",
+                bbox=bbox,
+                nprocs=1
+            )
+
+            # --- FIX 2: Use true grid resolution (NO artificial scaling) ---
+            nx = grid[0]   # 64
+            nz = grid[2]   # 512
+
+            center = ds.domain_center
+
+            slc = ds.slice('y', center[1])
+
+            frb = slc.to_frb(
+                width=ds.domain_width[0],
+                height=ds.domain_width[2],
+                resolution=(nx, nz),
+                center=center
+            )
+
+            # --- Extract images ---
+            temp_img_data = np.array(frb['gas', 'temperature'])
             ntot_img_data = np.array(frb['gas', 'number_density'])
-            halpha_data = np.array(frb['gas', 'halpha'])
-            ionizedh_data = np.array(frb3['gas', 'ionized_hydrogen'])
-            neutralh_data = np.array(frb['gas', 'neutral_hydrogen'])
-            vel_z_data = np.array(frb4['gas', 'velocity_z'])
+            Etot_img_data = np.array(frb['gas', 'total_energy'])
+            vel_z_data    = np.array(frb['gas', 'velocity_z'])
+
+            # --- Debug sanity check ---
+            print("FRB shape:", temp_img_data.shape)
+            print("Expected:", (nx, nz))
+            print("Box ratio (z/x):", box_z / box_x)
+            print("Pixel ratio:", temp_img_data.shape[1] / temp_img_data.shape[0])
             
 
             #   ds = [ds_ntot, ds_temp, ds_vz, ds_neutralh, ds_ionizedh, ds_halpha, ds_nf] #, ds_column_H, ds_column_HI, ds_column_HII]
@@ -175,33 +191,52 @@ for i, folder in enumerate(folders):
             
             print(f"Time Step: {time} Myr")
             print(f"Temp data shape: {temp_img_data.shape}, Min/Max: {np.min(temp_img_data):.2e}, {np.max(temp_img_data):.2e}")
-            plot_extent = [-box_x, box_x, -box_z, box_z]
+            plot_extent = [
+                -box_pc[0]/2, box_pc[0]/2,
+                -box_pc[2]/2, box_pc[2]/2
+            ]
 
-            mo1_s = mo1.imshow(temp_img_data.T, cmap='hot', extent=plot_extent, origin='lower', aspect='auto',norm=mcolors.LogNorm(vmin=100, vmax=1e7))
+            fig = plt.figure(layout='constrained', figsize=(20, 20 * (box_z / box_x)))
+
+            gs = GridSpec(3, 4, figure = fig)#,  width_ratios=[2, 2, 2, 1, 1, 1, 1, 0.1] )
+            mo1 = fig.add_subplot(gs[:,0])
+            mo2 = fig.add_subplot(gs[:,1])
+            mo3 = fig.add_subplot(gs[:,2])
+            mo4 = fig.add_subplot(gs[:,3])
+
+            # mo1.set_box_aspect(1)
+            # mo2.set_box_aspect(1)
+            # mo3.set_box_aspect(1)
+            # mo4.set_box_aspect(1)
+
+            mo1.set_xlabel('x (pc)')
+            mo2.set_xlabel('x (pc)')
+            mo3.set_xlabel('x (pc)')
+            mo4.set_xlabel('x (pc)')
+            mo1.set_ylabel('z (pc)')
+
+            mo1_s = mo1.imshow(temp_img_data.T, cmap='hot', extent=plot_extent, origin='lower', aspect='auto')#,norm=mcolors.LogNorm(vmin=1e2, vmax=1e6))
             cb1 = fig.colorbar(mo1_s, ax=mo1, label='Temp (K)', orientation='horizontal', location='top', shrink=0.83, pad=0.001)
-            mo2_s = mo2.imshow(neutralh_data.T, cmap='inferno', extent=plot_extent, origin='lower', aspect='auto', norm=mcolors.LogNorm(vmin=1e-10, vmax=1e0))
-            cb2 = fig.colorbar(mo2_s, ax=mo2, label=r'$n_{H^{0}}$ ($cm^{-3}$)', orientation='horizontal', location='top', shrink=0.83, pad=0.001)
-            mo3_s = mo3.imshow(ionizedh_data.T, cmap='bone', extent=plot_extent, origin='lower', aspect='auto', norm=mcolors.LogNorm(vmin=1e-7, vmax=1e-3))
-            cb3 = fig.colorbar(mo3_s, ax=mo3, label=r'$n_{H^{+}}$ ($cm^{-3}$)', orientation='horizontal', location='top', shrink=0.83, pad=0.001)
-            mo4_s = mo4.imshow(vel_z_data.T, cmap='twilight_shifted', extent=plot_extent, origin='lower', aspect='auto', vmin=-1.1*np.max(np.abs(vel_z_data)), vmax=1.1*np.max(np.abs(vel_z_data)))#,norm=mcolors.LogNorm(vmin=10, vmax=1e4))
+            mo2_s = mo2.imshow(ntot_img_data.T, cmap='inferno', extent=plot_extent, origin='lower', aspect='auto')#,vmin=-1.1*np.max(np.abs(ntot_img_data)), vmax=1.1*np.max(np.abs(ntot_img_data)))#, norm=mcolors.LogNorm(vmin=1, vmax=10))
+            cb2 = fig.colorbar(mo2_s, ax=mo2, label=r'Number Density (cm^{-3})', orientation='horizontal', location='top', shrink=0.83, pad=0.001)
+            mo3_s = mo3.imshow(Etot_img_data.T, cmap='bone', extent=plot_extent, origin='lower', aspect='auto')#,vmin=-1.1*np.max(np.abs(Etot_img_data)), vmax=1.1*np.max(np.abs(Etot_img_data)))#, norm=mcolors.LogNorm(vmin=1e34, vmax=1e41))
+            cb3 = fig.colorbar(mo3_s, ax=mo3, label=r'Total Energy (J)', orientation='horizontal', location='top', shrink=0.83, pad=0.001)
+            mo4_s = mo4.imshow(vel_z_data.T, cmap='twilight_shifted', extent=plot_extent, origin='lower', aspect='auto', vmin=-1.1*np.max(np.abs(vel_z_data)), vmax=1.1*np.max(np.abs(vel_z_data)))
             cb4 = fig.colorbar(mo4_s, ax=mo4, label=r'$v_{z}$ ($km \ s^{-1}$)', orientation='horizontal', location='top', shrink=0.83, pad=0.001)
-            
-            cb1.set_label('Temp (K)', labelpad=20)
-            cb2.set_label(r'$n_{H^{0}}$ ($cm^{-3}$)', labelpad=20)
-            cb3.set_label(r'$n_{H^{+}}$ ($cm^{-3}$)', labelpad=20)
+
+
+            cb1.set_label(r'Temperature (K)', labelpad=20)
+            cb2.set_label(r'Number Density ($cm^{-3}$)', labelpad=20)
+            cb3.set_label(r'Total Energy (J)', labelpad=20)
             cb4.set_label(r'$v_{z}$ ($km \ s^{-1}$)', labelpad=20)
 
 
-            # ensure directory exists
-            outdir = os.path.join(save_path, '2D_2')
-            os.makedirs(outdir, exist_ok=True)
-
-            # clean filename
-            time_str = f"{time:.2f}"
-            filepath = os.path.join(outdir, f"2D_Plot_{addon}{time_str}.png")
-
-            fig.savefig(filepath, dpi=300, bbox_inches='tight')
+            fig.suptitle(str(time)+' Myr')
+            filepath = os.path.join(save_path,'2D','2D_Plot_'+addon+str(time)+'.png')
+            fig.savefig(filepath)
             plt.close(fig)
+            print("Box (pc):", box_pc)
+            
 
 
 '''

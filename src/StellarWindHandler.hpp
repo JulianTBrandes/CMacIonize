@@ -52,8 +52,8 @@ public:
    
    inline double get_sw_mass_loss_rate(double mass){
 
-      static const std::vector<double> table_mass = { 5.897418435090001e+32, 3.94091048052e+32, 2.9619041341500004e+32, 2.37256574139e+32, 1.68294037743e+32, 1.18929695157e+32, 7.939154960100001e+31, 6.355975005900001e+31, 4.9686405444000005e+31, 3.9763978605000006e+31, 2.982752136e+31, 2.3865933429e+31, 1.7900813034e+31, 1.3922990055000003e+31 };
-      static const std::vector<double> table_mass_loss_rate = { -4.125, -4.45, -4.691, -4.888, -5.22, -5.605, -6.149, -6.511, -6.977, -7.471, -7.976, -8.679, -9.973, -11.428 };
+      static constexpr std::array<double, 14> table_mass = { 296.5017, 198.1353, 148.9142, 119.2844, 84.6124, 59.7937, 39.9153, 31.9556, 24.9806, 19.9919, 14.9962, 11.999, 8.9999, 7.0 } ;
+      static constexpr std::array<double, 14> table_mass_loss_rate = { -4.125, -4.45, -4.691, -4.888, -5.22, -5.605, -6.149, -6.511, -6.977, -7.471, -7.976, -8.679, -9.973, -11.428 } ;
       double mass_loss_rate = 0.0;
 
       if (mass > table_mass.front()){
@@ -78,13 +78,14 @@ public:
       }
 
       mass_loss_rate = std::pow(10.0, mass_loss_rate) * 1.989e30;
-      return mass_loss_rate; //in kg
+      return mass_loss_rate; //in kg per year
    };
 
    inline double get_sw_velocity(double mass){
 
-      static const std::vector<double> table_mass = { 5.897418435090001e+32, 3.94091048052e+32, 2.9619041341500004e+32, 2.37256574139e+32, 1.68294037743e+32, 1.18929695157e+32, 7.939154960100001e+31, 6.355975005900001e+31, 4.9686405444000005e+31, 3.9763978605000006e+31, 2.982752136e+31, 2.3865933429e+31, 1.7900813034e+31, 1.3922990055000003e+31};
-      static const std::vector<double> table_vels = { 3359.3377, 3368.0662, 3357.7034, 3338.8328, 3289.3316, 3211.7465, 3087.2741, 3004.4142, 2902.0406, 2801.616, 2664.5831, 2555.2617, 2413.9634, 1788.908};
+      static constexpr std::array<double, 14> table_mass = { 296.5017, 198.1353, 148.9142, 119.2844, 84.6124, 59.7937, 39.9153, 31.9556, 24.9806, 19.9919, 14.9962, 11.999, 8.9999, 7.0 } ;
+      static constexpr std::array<double, 14> table_vels = { 3359.3377, 3368.0662, 3357.7034, 3338.8328, 3289.3316, 3211.7465, 3087.2741, 3004.4142, 2902.0406, 2801.616, 2664.5831, 2555.2617, 2413.9634, 1788.908 } ;
+      // https://arxiv.org/abs/1110.5049
       double vel = 0.0;
 
       if (mass > table_mass.front()){
@@ -117,6 +118,9 @@ public:
     double mass,
     double timestep)
 {
+    if (mass >= 10000)
+        mass = mass / 1.989e30; // convert into solar masses if kg
+        
     double mdot  = get_sw_mass_loss_rate(mass);
     double vwind = get_sw_velocity(mass) * 1000.0;
 
@@ -144,22 +148,24 @@ public:
     double mass_per_cell   = mass_to_inject / numcells;
     double energy_per_cell = energy_to_inject / numcells;
 
-    double density_add = mass_per_cell / cell_vol;
+    double density_per_cell = mass_per_cell / cell_vol;
+
+    // std::cout << "\n STELLAR WIND INJECTION - MASS OF STAR = " << mass << "\n";
+    // std::cout << "\n STELLAR WIND INJECTION - MASS PER CELL = " << mass_per_cell << "\n";
+    // std::cout << "\n STELLAR WIND INJECTION - ENERGY PER CELL = " << energy_per_cell << "\n";
 
     for (const auto &c : cells) {
-
         auto sg_it = grid_creator->get_subgrid(c.first);
         HydroDensitySubGrid &sg = *sg_it;
 
         auto cellit = sg.hydro_begin() + c.second;
-
         auto &hydro_vars = cellit.get_hydro_variables();
 
         double rho_old = hydro_vars.get_primitives_density();
         double m_old   = hydro_vars.get_conserved_mass();
 
         hydro_vars.set_primitives_density(
-            rho_old + density_add);
+            rho_old + density_per_cell);
 
         hydro_vars.set_conserved_mass(
             m_old + mass_per_cell);

@@ -32,6 +32,7 @@
 #include "RandomGenerator.hpp"
 #include "DensitySubGridCreator.hpp"
 #include "SupernovaHandler.hpp"
+#include "StellarWindHandler.hpp"
 #include "WMBasicPhotonSourceSpectrum.hpp"
 #include "PowerLawPhotonSourceSpectrum.hpp"
 #include "Pegase3PhotonSourceSpectrum.hpp"
@@ -179,6 +180,7 @@ private:
   RandomGenerator _random_generator;
 
   SupernovaHandler *novahandler;
+  StellarWindHandler *swhandler;
 
   Log *_log;
 
@@ -375,6 +377,7 @@ public:
         _random_generator(seed), _log(log){
 
     novahandler = new SupernovaHandler(_sne_energy);
+    swhandler = new StellarWindHandler();
 
     
 
@@ -802,7 +805,7 @@ public:
    * @param simulation_time Current simulation time (in s).
    * @return True if the distribution changed, false otherwise.
    */
-   virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double actual_timestep) override {
+   virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, Hydro &hydro, double actual_timestep) override {
 
     _total_time += actual_timestep;
 
@@ -846,6 +849,13 @@ public:
 
 
       } else {
+        // Inject Stellar Wind
+        swhandler->inject_sw(
+            grid_creator,
+            hydro,
+            _source_positions[i],
+            _source_masses[i],
+            actual_timestep);
         // check the next element
         ++i;
       }
@@ -860,7 +870,7 @@ public:
 
     double area_kpc = _sides_x*_sides_y/(unit_kpc*unit_kpc);
 
-    std::cout<<"Area = " << area_kpc << std::endl;
+    // std::cout<<"Area = " << area_kpc << std::endl;
 
 
     int should_have_done = int(4*area_kpc*_total_time/unit_Myr); //3.15576e13); // taken out *0 mgb 09.10.2025 
@@ -1371,6 +1381,7 @@ public:
         }
 
   novahandler = new SupernovaHandler(_sne_energy);
+  swhandler = new StellarWindHandler();
   }
 };
 

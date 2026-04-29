@@ -32,6 +32,7 @@
 #include "RandomGenerator.hpp"
 #include "DensitySubGridCreator.hpp"
 #include "SupernovaHandler.hpp"
+#include "StellarWindHandler.hpp"
 #include "WMBasicPhotonSourceSpectrum.hpp"
 #include "PowerLawPhotonSourceSpectrum.hpp"
 #include "Pegase3PhotonSourceSpectrum.hpp"
@@ -63,6 +64,8 @@ private:
   std::vector< double > _source_lifetimes;
 
   std::vector< double > _source_luminosities;
+
+  std::vector< double > _source_masses;
 
   std::vector<int> _to_delete;
 
@@ -138,6 +141,7 @@ private:
   RandomGenerator _random_generator;
 
   SupernovaHandler *novahandler;
+  StellarWindHandler *swhandler;
 
   Log *_log;
 
@@ -279,6 +283,7 @@ public:
    *
    * @param source_lifetime Lifetime of a source (in s).
    * @param source_luminosity Ionising luminosity of a single source (in s^-1).
+   * @param source_masses Mass of a source (in Msol).
    * @param average_number Average number of sources at any given time.
    * @param anchor_x x component of the anchor of the rectangular disk (in m).
    * @param sides_x x side length of the rectangular disk (in m).
@@ -319,6 +324,7 @@ public:
         _random_generator(seed), _log(log){
 
     novahandler = new SupernovaHandler(_sne_energy);
+    swhandler = new StellarWindHandler();
 
     
 
@@ -420,6 +426,8 @@ public:
             _source_positions.push_back(CoordinateVector<double>(posx,posy,posz));
 
             _source_luminosities.push_back(luminosity);
+
+            _source_masses.push_back(mass);
             
             double lifetime = a0z + a1z*std::log10(mass) + a2z*(std::log10(mass)*std::log10(mass));
             lifetime = std::pow(10.0,lifetime);
@@ -670,7 +678,7 @@ public:
    * @param simulation_time Current simulation time (in s).
    * @return True if the distribution changed, false otherwise.
    */
-   virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double actual_timestep) override {
+   virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, Hydro &hydro, double actual_timestep) override {
 
     _total_time += actual_timestep;
 
@@ -695,6 +703,7 @@ public:
         _source_positions.erase(_source_positions.begin() + i);
         _source_lifetimes.erase(_source_lifetimes.begin() + i);
         _source_luminosities.erase(_source_luminosities.begin() + i);
+        _source_masses.erase(_source_masses.begin() + i);
         _spectrum_index.erase(_spectrum_index.begin() + i);
         _source_indices.erase(_source_indices.begin() + i);
         _num_sne = _num_sne + 1;
@@ -703,6 +712,13 @@ public:
 
 
       } else {
+        // Inject Stellar Wind
+        swhandler->inject_sw(
+            grid_creator,
+            hydro,
+            _source_positions[i],
+            _source_masses[i],
+            actual_timestep);
         // check the next element
         ++i;
       }
@@ -772,9 +788,11 @@ public:
         _source_positions.push_back(CoordinateVector<double>(x,y,z));
 
         double lifetime = 1e99;
+        double mass = 0;
 
         _source_lifetimes.push_back(lifetime);
         _source_luminosities.push_back(_holmes_lum);
+        _source_masses.push_back(mass);
         if (_output_file != nullptr) {
           _source_indices.push_back(_next_index);
           ++_next_index;
@@ -962,6 +980,8 @@ public:
         std::cout << "source luminosity =  " << luminosity_from_mass << " mass = " << m_cur << std::endl; // mgb 06.10
         _source_luminosities.push_back(luminosity_from_mass);
         std::cout << "source luminosities pushed =  " << offset<< std::endl; // mgb 06.10
+        _source_masses.push_back(m_cur);
+        std::cout << "source mass pushed =  " << offset<< std::endl; // jb450 01.04.2026
         std::cout << "source indices =  " << _next_index<< std::endl; // mgb 06.10
         _source_indices.push_back(_next_index);
         std::cout << "source indices pushed, before ++next_index " << _next_index<< std::endl; // mgb 06.10 
@@ -1068,6 +1088,14 @@ public:
       }
 
     }
+    {
+      const auto size = _source_masses.size();
+      restart_writer.write(size);
+      for (std::vector< double >::size_type i = 0; i < size; ++i) {
+        restart_writer.write(_source_masses[i]);
+      }
+
+    }
     restart_writer.write(_number_of_updates);
     const bool has_output = (_output_file != nullptr);
     restart_writer.write(has_output);
@@ -1137,6 +1165,14 @@ public:
         _source_luminosities[i] = restart_reader.read< double >();
       }
     }
+    {
+      const std::vector< double >::size_type size =
+          restart_reader.read< std::vector< double >::size_type >();
+      _source_masses.resize(size);
+      for (std::vector< double >::size_type i = 0; i < size; ++i) {
+        _source_masses[i] = restart_reader.read< double >();
+      }
+    }
     _number_of_updates = restart_reader.read< uint_fast32_t >();
     const bool has_output = restart_reader.read< bool >();
     if (has_output) {
@@ -1187,6 +1223,7 @@ public:
         }
 
   novahandler = new SupernovaHandler(_sne_energy);
+  swhandler = new StellarWindHandler();
   }
 };
 
