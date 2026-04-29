@@ -2188,6 +2188,7 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
       ++hydro_lastrad;
 
     if(sourcedistribution != nullptr) {
+   //   log->write_status("Getting Total Luminosity: ", sourcedistribution->get_total_luminosity());
 
       if (sourcedistribution->get_total_luminosity() > 0.) {
         time_logger.start("radiation transfer");
@@ -2869,11 +2870,11 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
     if (sourcedistribution != nullptr) {
 
-      if (_moving_sources_flag == true) { // mgb edit
-      sourcedistribution->set_initial_velocity(grid_creator,actual_timestep);
-      sourcedistribution->float_sources(grid_creator,actual_timestep);
-      log->write_status("Source positions have been updated in float_sources");
-      }
+     // if (_moving_sources_flag == true) { // mgb edit
+     // sourcedistribution->set_initial_velocity(grid_creator,actual_timestep);
+    //  sourcedistribution->float_sources(grid_creator,actual_timestep);
+   //   log->write_status("Source positions have been updated in float_sources");
+     // }
      //sourcedistribution->float_sources(grid_creator,actual_timestep); # taken out and replaced with if flag mgb 16.10.2025
 
       sourcedistribution->accrete_gas(grid_creator,hydro);
@@ -3039,6 +3040,11 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
       if (sourcedistribution != nullptr) {
 
+        if (_moving_sources_flag == true) { // mgb edit 09.03.2026
+     // sourcedistribution->set_initial_velocity(grid_creator,actual_timestep);
+          sourcedistribution->float_sources(grid_creator,actual_timestep);
+          log->write_status("Source positions have been updated in float_sources");
+         }
 
       if (sourcedistribution->update(grid_creator,actual_timestep)) {
 
@@ -3046,6 +3052,12 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
 
         temperature_calculator->update_luminosity(
             sourcedistribution->get_total_luminosity());
+
+       // if (_moving_sources_flag == true) { // mgb edit
+     // sourcedistribution->set_initial_velocity(grid_creator,actual_timestep);
+        //sourcedistribution->float_sources(grid_creator,actual_timestep);
+       // log->write_status("Source positions have been updated in float_sources");
+      //  }
 
         if (log) {
           log->write_status("Updating subgrid copy hierarchy after source "

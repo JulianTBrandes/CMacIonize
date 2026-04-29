@@ -49,6 +49,7 @@
 #include "BurstyPhotonSourceDistribution.hpp"
 #include "BurstyPhotonSourceDistributionAsymmetric.hpp"
 #include "SteadySFRPhotonSourceDistribution.hpp" // mgb 20.01.2026
+#include "MovingSourcesPhotonSourceDistribution.hpp" // mgb edit 05.03.2026
 #include "StellarClusterPhotonSourceDistribution.hpp"
 #include "SinkStarPhotonSourceDistribution.hpp"
 
@@ -139,6 +140,8 @@ public:
       return new BurstyPhotonSourceDistributionAsymmetric(params,log); // mgb edit 14.11.2025 
     } else if (type == "SteadySFR"){
       return new SteadySFRPhotonSourceDistribution(params,log); // mgb edit 20.01.2026
+    } else if (type == "MovingSources"){
+      return new MovingSourcesPhotonSourceDistribution(params,log); // mgb edit 05.03.2026
     } else if (type == "SILCC") {
       return new SILCCPhotonSourceDistribution(params, log);
     } else if (type == "SingleStar") {
@@ -213,6 +216,8 @@ public:
       return new BurstyPhotonSourceDistributionAsymmetric(restart_reader); // mgb edit 14.11.2025
     } else if (tag == typeid(SteadySFRPhotonSourceDistribution).name()){
       return new SteadySFRPhotonSourceDistribution(restart_reader); // mgb edit 20.01.2026
+    } else if (tag == typeid(MovingSourcesPhotonSourceDistribution).name()){
+      return new MovingSourcesPhotonSourceDistribution(restart_reader); // mgb edit 05.03.2026
     } else if (tag == typeid(SingleStarPhotonSourceDistribution).name()) {
       return new SingleStarPhotonSourceDistribution(restart_reader);
     } else if (tag == typeid(SingleSupernovaPhotonSourceDistribution).name()) {
