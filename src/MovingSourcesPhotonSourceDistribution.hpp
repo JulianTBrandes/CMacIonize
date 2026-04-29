@@ -32,6 +32,7 @@
 #include "RandomGenerator.hpp"
 #include "DensitySubGridCreator.hpp"
 #include "SupernovaHandler.hpp"
+#include "StellarWindHandler.hpp"
 #include "WMBasicPhotonSourceSpectrum.hpp"
 #include "PowerLawPhotonSourceSpectrum.hpp"
 #include "Pegase3PhotonSourceSpectrum.hpp"
@@ -186,6 +187,7 @@ private:
   RandomGenerator _random_generator;
 
   SupernovaHandler *novahandler;
+  StellarWindHandler *swhandler;
 
   Log *_log;
 
@@ -384,7 +386,8 @@ public:
         _random_generator(seed), _log(log){
 
     novahandler = new SupernovaHandler(_sne_energy);
-
+    swhandler = new StellarWindHandler();
+    
     
 
     _all_spectra.push_back(new WMBasicPhotonSourceSpectrum(32000,25,log));
@@ -851,7 +854,9 @@ public:
    * @param simulation_time Current simulation time (in s).
    * @return True if the distribution changed, false otherwise.
    */
-   virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double actual_timestep) override {
+   bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator,
+            Hydro &hydro,
+            double actual_timestep) override {
 
     _total_time += actual_timestep;
 
@@ -897,6 +902,13 @@ public:
 
 
       } else {
+        // Inject Stellar Wind
+        swhandler->inject_sw(
+            grid_creator,
+            hydro,
+            _source_positions[i],
+            _source_masses[i],
+            actual_timestep);
         // check the next element
         ++i;
       }
@@ -1009,23 +1021,22 @@ public:
 // stellar sources implementaiton
   if (_single_star_flag == true) { // mgb edit 05.03.2026
     if (_number_of_updates == 1) {
+      for (int i = 0; i < 6; i++) {
       std::cout << "Making 1 single star " << _single_star_flag << std::endl;
-      
 
       double m_cur = get_single_mass(_mass_range,_cum_imf,
               _random_generator.get_uniform_random_double());
       double x =
         _anchor_x + _random_generator.get_uniform_random_double() * _sides_x;
-      double y =
-        _anchor_y + _random_generator.get_uniform_random_double() * _sides_y;
+      double y = 0;
+        // _anchor_y + _random_generator.get_uniform_random_double() * _sides_y;
   // we use the Box-Muller method to sample the Gaussian
-      double z =
-        (_scaleheight) *
-          std::sqrt(-2. *
-                    std::log(_random_generator.get_uniform_random_double())) *
-          std::cos(2. * M_PI *
-                    _random_generator.get_uniform_random_double());
-
+      double z = _anchor_x + _random_generator.get_uniform_random_double() * _sides_y;
+         //(_scaleheight) *
+           //std::sqrt(-2. *
+                     //std::log(_random_generator.get_uniform_random_double())) *
+           //std::cos(2. * M_PI *
+                     //_random_generator.get_uniform_random_double());
 
     _source_positions.push_back(CoordinateVector<double>(x,y,z));
 
@@ -1052,6 +1063,7 @@ public:
     size_t closestIndex = findClosestIndex(interpolatedTemp, avail_temps);
     _spectrum_index.push_back(closestIndex);
     std::cout << "MAKING SINGLE STAR OF MASS " << m_cur << " temp = " << interpolatedTemp << " specindex = " << closestIndex <<  std::endl;
+    std::cout << "MAKING SINGLE STAR AT POSITION x = " << x << " y = " << y << " z = " << z <<  std::endl;
 //    std::cout << "velocity assigned: x = " << _source_velocities_x.back() << " y = " << _source_velocities_y.back() << " z = " << _source_velocities_z.back() << std::endl;
 
     if (_output_file != nullptr) {
@@ -1069,7 +1081,7 @@ public:
    }
     updated = true;
     ++_number_of_updates;
-
+  }
   } else {
       std::cout << "Making stars according to SFR " << _single_star_flag << std::endl;
       if (_total_time - _last_sf > _update_interval) {
@@ -1505,6 +1517,7 @@ public:
         }
 
   novahandler = new SupernovaHandler(_sne_energy);
+  swhandler = new StellarWindHandler();
   }
 };
 

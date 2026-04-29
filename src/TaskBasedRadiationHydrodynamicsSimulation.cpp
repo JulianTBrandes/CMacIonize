@@ -3045,7 +3045,6 @@ int TaskBasedRadiationHydrodynamicsSimulation::do_simulation(
           sourcedistribution->float_sources(grid_creator,actual_timestep);
           log->write_status("Source positions have been updated in float_sources");
          }
-
       if (sourcedistribution->update(grid_creator,hydro,actual_timestep)) {
 
         time_logger.start("source update");

@@ -222,7 +222,7 @@ public:
     } else if (tag == typeid(MovingSourcesPhotonSourceDistribution).name()){
       return new MovingSourcesPhotonSourceDistribution(restart_reader); // mgb edit 05.03.2026
     } else if (tag == typeid(SingleStarPhotonSourceDistribution).name()) {
-      return new SingleStarPhotonSourceDistribution(restart_reader);
+      return new SingleStarPhotonSourceDistribution(restart_reader); // jb450 edit 18.03.2026
     } else if (tag == typeid(SingleSupernovaPhotonSourceDistribution).name()) {
       return new SingleSupernovaPhotonSourceDistribution(restart_reader);
     } else if (tag == typeid(SinkStarPhotonSourceDistribution).name()) {

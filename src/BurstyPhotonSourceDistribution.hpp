@@ -32,6 +32,7 @@
 #include "RandomGenerator.hpp"
 #include "DensitySubGridCreator.hpp"
 #include "SupernovaHandler.hpp"
+#include "StellarWindHandler.hpp" //jb450
 #include "WMBasicPhotonSourceSpectrum.hpp"
 #include "PowerLawPhotonSourceSpectrum.hpp"
 #include "Pegase3PhotonSourceSpectrum.hpp"
@@ -181,6 +182,7 @@ private:
   RandomGenerator _random_generator;
 
   SupernovaHandler *novahandler;
+  StellarWindHandler *swhandler;
 
   Log *_log;
 
@@ -378,6 +380,7 @@ public:
         _random_generator(seed), _log(log){
 
     novahandler = new SupernovaHandler(_sne_energy);
+    swhandler = new StellarWindHandler();
 
     
 
@@ -806,7 +809,7 @@ public:
    * @param simulation_time Current simulation time (in s).
    * @return True if the distribution changed, false otherwise.
    */
-   virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, double actual_timestep) override {
+   virtual bool update(DensitySubGridCreator< HydroDensitySubGrid > *grid_creator, Hydro &hydro, double actual_timestep) override {
 
     _total_time += actual_timestep;
 
@@ -850,8 +853,14 @@ public:
 
 
       } else {
+        // Inject Stellar Wind
+        swhandler->inject_sw(
+            grid_creator,
+            hydro,
+            _source_positions[i],
+            _source_masses[i],
+            actual_timestep);
         // check the next element
-        // add stellar wind
         ++i;
       }
     }
@@ -1382,6 +1391,7 @@ public:
         }
 
   novahandler = new SupernovaHandler(_sne_energy);
+  swhandler = new StellarWindHandler();
   }
 };
 
